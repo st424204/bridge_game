@@ -1,0 +1,142 @@
+<html>
+  <head>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
+	<script src="poker.min.js"></script>
+  </head>
+  <body>
+	<h1 id="player_id"></h1>
+	<div><textarea id="teamA" readonly></textarea></div>
+	<div><textarea id="teamB" readonly></textarea></div>
+	<textarea id="sit_1" readonly></textarea>
+	<div><textarea id="sit_0" readonly></textarea> <textarea style="width:300px;height:100px;" id="display_message" readonly></textarea> <textarea id="sit_2" readonly></textarea></div>
+	<div><textarea id="player_cards" readonly></textarea></div>
+	<div><textarea id="user_data"></textarea><br><button onclick="onsend(0)">Send</button><button onclick="onsend(1)">pass</button></div>
+	<div id="table"></div>
+	<div id="container"></div>
+	
+    <script>
+	  var up=-1;
+      var socket = io.connect();
+	  var player_id = 0;
+	  var player_cards = [];
+	  var start_request = 0;
+	  var player_sit = [];
+	  var container = document.getElementById('container'), domCanvas = document.createElement('canvas'), canvas = domCanvas.getContext('2d');
+	  container.appendChild(domCanvas);
+	  var table = document.getElementById('table'), tableCanvas = document.createElement('canvas'), tcanvas = tableCanvas.getContext('2d');
+	  table.appendChild(tableCanvas);
+	  
+	  
+	  var param = {};
+	  
+
+	  function showpoker(size,data) {
+		  var h = +(size || 200), w = h * 0.25, x = 0, y = 30, suits = ['clubs', 'diamonds','hearts', 'spades'], points = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'j', 'q', 'k','a'];
+		  domCanvas.height = h + 30;
+		  domCanvas.width = 13 * w + h * 0.5;
+		  param.h = h;
+		  param.w = w;
+
+		  for (var key=0;key<13;key++) {
+			i=data[key];
+			if(i!=-1){
+				if(key==up) y-=30;
+				canvas.drawPokerCard(x, y, h, suits[Math.floor((i-1)/13)], points[(i-1)%13]);
+				x += w;
+				if(key==up) y+=30;
+			}
+		  }
+	  }
+	  
+	  function showtable(size,data) {
+		  var h = +(size || 200), w = h * 0.75, x = 0, y = 0, suits = ['clubs', 'diamonds','hearts', 'spades'], points = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'j', 'q', 'k','a'];
+		  tableCanvas.height = h *3;
+		  tableCanvas.width = w*3 ;
+		  var index = player_sit.indexOf(player_id);
+		  var i=data[player_sit[(index+1)%4]-1];
+		  if(i!=-1) tcanvas.drawPokerCard(0, h, h, suits[Math.floor((i-1)/13)], points[(i-1)%13]);
+		  i=data[player_sit[(index+2)%4]-1];
+		  if(i!=-1) tcanvas.drawPokerCard(w, 0, h, suits[Math.floor((i-1)/13)], points[(i-1)%13]);
+		  i=data[player_sit[(index+3)%4]-1];
+		  if(i!=-1) tcanvas.drawPokerCard(w+w, h, h, suits[Math.floor((i-1)/13)], points[(i-1)%13]);
+		  i=data[player_sit[(index+4)%4]-1];
+		  if(i!=-1) tcanvas.drawPokerCard(w, h+h, h, suits[Math.floor((i-1)/13)], points[(i-1)%13]);
+	  }
+	  
+	  
+	  
+	  socket.on('player_id', function(data) {
+        $('#player_id').text("Welcome Player #".replace("#",data.player_id));
+		$('#display_message').text(data.display_message);
+		player_id = data.player_id;
+		start_request = 1;
+      });
+	  
+	  setInterval(function() {
+			if(start_request){
+				socket.emit('request_data', {'player_id': player_id });
+			}
+				
+		},50)
+	  socket.on('get_data', function(data) {
+		$('#display_message').text(data.display_message);
+		if(data.display_message!='wait'){
+			$('#player_cards').text(data.player_cards.toString());
+			showpoker(120,data.player_cards);
+			showtable(120,data.on_table);
+			player_cards = data.player_cards.slice();
+			player_sit = data.player_sit.slice();
+			
+			
+			var index = data.player_sit.indexOf(player_id);
+			$('#teamA').text("player "+data.player_sit[0]+","+data.player_sit[2]+" with "+data.teams[0]+"\nGoal to Win is "+data.goals[0]);
+			$('#teamB').text("player "+data.player_sit[1]+","+data.player_sit[3]+" with "+data.teams[1]+"\nGoal to Win is "+data.goals[1]);
+			$('#sit_0').text("player "+data.player_sit[(index+1)%4]);
+			$('#sit_1').text("player "+data.player_sit[(index+2)%4]);
+			$('#sit_2').text("player "+data.player_sit[(index+3)%4]);
+		}		
+      });
+	  function onsend(opt){
+		if(opt==0) socket.emit('user_data', {'player_id': player_id , 'user_data':$('#user_data').val()});
+		else if(opt==1) socket.emit('user_data', {'player_id': player_id , 'user_data':"pass"});
+		
+		$('#user_data').val('')
+		
+	  }
+	  domCanvas.addEventListener('click', function(e) {
+				var x = ((e.pageX - e.target.offsetLeft) / param.w) | 0, y = ((e.pageY - e.target.offsetTop ) / param.h) | 0;
+				
+				var val=0;
+				for(var i=0;i<13;i++){
+					if(player_cards[i]!=-1){
+						val = player_cards[i];
+						if(x==0) break;
+						x--;
+					}
+					
+				}
+				
+				socket.emit('user_data', {'player_id': player_id , 'user_data':val});
+
+		});
+      domCanvas.addEventListener('mousemove', function(e) {
+			var x = ((e.pageX - e.target.offsetLeft) / param.w) | 0, y = ((e.pageY - e.target.offsetTop ) / param.h) | 0;
+			var val=0;
+			for(var i=0;i<13;i++){
+				if(player_cards[i]!=-1){
+					val = i;
+					if(x==0) break;
+					x--;
+				}
+				
+			}
+			up=val;
+	 });
+	  domCanvas.addEventListener('mouseout', function(e) {
+		up=-1;
+	  });
+    </script>
+	
+  </body>
+</html>
