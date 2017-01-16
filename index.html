@@ -1,0 +1,387 @@
+<html>
+<head>
+	<script src="/socket.io/socket.io.js"></script>
+	<script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
+	<script src="poker.min.js"></script>
+	<style>
+		canvas {
+			float:left;
+			background-color: #00DD00;
+			display: block;
+			margin: 0 auto;
+		}
+		#content{
+			//width:80%;
+			height:100%;
+			text-align:center;
+			float:left;
+		}
+	</style>
+</head>
+<body>
+	<h1 id="player_id"></h1>
+	<!--div><textarea id="teamA" readonly></textarea></div>
+	<div><textarea id="teamB" readonly></textarea></div>
+	<textarea id="sit_1" readonly></textarea>
+	<div><textarea id="sit_0" readonly></textarea> <textarea style="width:300px;height:100px;" id="display_message" readonly></textarea> <textarea id="sit_2" readonly></textarea></div>
+	<div><textarea id="player_cards" readonly></textarea></div>
+	<div><textarea id="user_data"></textarea><br><button onclick="onsend(0)">Send</button><button onclick="onsend(1)">pass</button></div>
+	<div id="table2"></div-->
+	<!--div id="container"></div-->
+	<div id="content">
+		<canvas id="table" width="600" height="600"></canvas>
+		<div id="bidding" style="visibility: hidden; margin: 5 auto;">
+			<input type="number" id="call_number" style="font-size:40px; width: 50px; height: 50px;"></textarea>
+			<button id="NT" style="font-size:40px; width: 50px; height: 50px;">N</button>
+			<button id="spade" style="font-size:40px; width: 50px; height: 50px;">♠</button>
+			<button id="heart" style="font-size:40px; width: 50px; height: 50px; color: red;">♥</button>
+			<button id="diamond" style="font-size:40px; width: 50px; height: 50px; color: red;">♦</button>
+			<button id="clover" style="font-size:40px; width: 50px; height: 50px;">♣</button>
+			<button id="pass" style="font-size:40px; width: 50px; height: 50px;">P</button>
+		</div>
+	</div>
+
+	<script>
+	var up = -1;
+	var socket = io.connect();
+	var player_id = 0;
+	var player_cards = [];
+	var start_request = 0;
+	var player_sit = [];
+	var goals = [2];
+	var teams = [2];
+	var player_sit_index = -1;
+	var on_table = [-1, -1, -1, -1];
+	var current_call = -1;
+	var calling = false;
+	var CallOver = false;
+	var canvas = document.getElementById("table");
+	var ctx = canvas.getContext("2d");
+	var state = 0;
+	var moving = -1;
+	var winner = -1;
+	var param = {};
+
+
+	function showpoker(data) {
+		var h = 120, w = 35, x = 80, y = 480, suits = ['clubs', 'diamonds','hearts', 'spades'], points = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'j', 'q', 'k','a'];
+		param.h = h;
+		param.w = w;
+
+		for (var key = 0; key < 13; key ++) {
+			var i=data[key];
+			if(i != -1){
+				if(key == up) y -= 30;
+				ctx.drawPokerCard(x, y, h, suits[Math.floor((i - 1) / 13)], points[(i - 1) % 13]);
+				x += w;
+				if(key == up) y += 30;
+			}
+		}
+	}
+
+	function showtable(data) {
+		var h = 120, w = 80, x = 0, y = 0, suits = ['clubs', 'diamonds','hearts', 'spades'], points = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'j', 'q', 'k','a'];
+		if(player_sit_index != -1){
+			var i = data[player_sit[(player_sit_index + 1) % 4] - 1];
+			if(i != -1) ctx.drawPokerCard(200, 240, h, suits[Math.floor((i - 1) / 13)], points[(i - 1) % 13]);
+			i = data[player_sit[(player_sit_index + 2) % 4] - 1];
+			if(i != -1) ctx.drawPokerCard(260, 140, h, suits[Math.floor((i - 1) / 13)], points[(i - 1) % 13]);
+			i = data[player_sit[(player_sit_index + 3) % 4] - 1];
+			if(i != -1) ctx.drawPokerCard(320, 240, h, suits[Math.floor((i - 1) / 13)], points[(i - 1) % 13]);
+			i = data[player_sit[(player_sit_index + 4) % 4] - 1];
+			if(i != -1) ctx.drawPokerCard(260, 340, h, suits[Math.floor((i - 1) / 13)], points[(i - 1) % 13]);
+		}
+	}
+
+	function legal_call(t) {
+		var c_num = document.getElementById("call_number").value;
+		if(c_num <= 0 || c_num > 7){
+			alert("Illegal call!");
+			return false;
+		}
+		if(((c_num - 1) * 5 + t) <= current_call){
+			alert("Illegal call!");
+			return false;
+		}
+		return ((c_num - 1) * 5 + t);
+	}
+
+	function call(t) {
+		if(t == 'pass') socket.emit('user_data', {'player_id': player_id , 'user_data': 'pass'});
+		else socket.emit('user_data', {'player_id': player_id , 'user_data': t+1});
+		document.getElementById("bidding").style.visibility="hidden";
+		calling = false;
+	}
+
+	$('#NT').click(function() {
+		var c_check = legal_call(4);
+		if(c_check) call(c_check);
+		return false;
+	});
+
+	$('#spade').click(function() {
+		var c_check = legal_call(3);
+		if(c_check) call(c_check);
+		return false;
+	});
+
+	$('#heart').click(function() {
+		var c_check = legal_call(2);
+		if(c_check) call(c_check);
+		return false;
+	});
+
+	$('#diamond').click(function() {
+		var c_check = legal_call(1);
+		if(c_check) call(c_check);
+		return false;
+	});
+
+	$('#clover').click(function() {
+		var c_check = legal_call(0);
+		if(c_check !== false) call(c_check);
+		return false;
+	});
+
+	$('#pass').click(function() {
+		if(current_call == -1) alert("You shall not pass!");
+		else call('pass');
+		return false;
+	});
+	
+	socket.on('over', function(data) {
+		winner = data.winner;
+		var display_message;
+		if(pwinner) display_message = "Team B Win";
+		else display_message = "Team A Win";
+		alert(display_message);
+	});
+
+	socket.on('call', function(data) {
+		current_call = data.current_call - 1;
+		document.getElementById("bidding").style.visibility="visible";
+		calling = true;
+	});
+	
+	socket.on('player_id', function(data) {//init
+		//$('#player_id').text("Welcome Player #".replace("#",data.player_id));
+		//$('#display_message').text(data.display_message);
+		player_id = data.player_id;
+		start_request = 1;
+		up = -1;
+		player_cards = [];
+		player_sit = [];
+		goals = [2];
+		teams = [2];
+		player_sit_index = -1;
+		on_table = [-1, -1, -1, -1];
+		current_call = -1;
+		calling = false;
+		CallOver = false;
+		state = 0;
+		moving = -1;
+		document.getElementById("bidding").style.visibility="hidden";
+	});
+
+	setInterval(function() {
+		if(start_request){
+			socket.emit('request_data', {'player_id': player_id });
+		}
+	},500)
+
+	socket.on('get_data', function(data) {
+		$('#display_message').text(data.display_message);
+		if(data.display_message!='wait'){
+			$('#player_cards').text(data.player_cards.toString());
+			on_table = data.on_table.slice();
+			player_cards = data.player_cards.slice();
+			player_sit = data.player_sit.slice();
+			teams = data.teams;
+			goals = data.goals;
+			state = data.state;
+			moving = data.moving;
+			if(data.state == 1) current_call = data.current_call - 1;
+			else if(data.state == 2) CallOver = true;
+			player_sit_index = data.player_sit.indexOf(player_id);
+			/*$('#teamA').text("player "+data.player_sit[0]+","+data.player_sit[2]+" with "+data.teams[0]+"\nGoal to Win is "+data.goals[0]);
+			$('#teamB').text("player "+data.player_sit[1]+","+data.player_sit[3]+" with "+data.teams[1]+"\nGoal to Win is "+data.goals[1]);
+			$('#sit_0').text("player "+data.player_sit[(player_sit_index + 1) % 4]);
+			$('#sit_1').text("player "+data.player_sit[(player_sit_index + 2) % 4]);
+			$('#sit_2').text("player "+data.player_sit[(player_sit_index + 3) % 4]);*/
+		}		
+	});
+	
+	function onsend(opt) {
+		if(opt == 0) socket.emit('user_data', {'player_id': player_id, 'user_data': $('#user_data').val()});
+		else if(opt == 1) socket.emit('user_data', {'player_id': player_id, 'user_data': "pass"});
+
+		$('#user_data').val('')
+	}
+
+	function bid_parser(call) {
+		if(call == -1) return {'str': 'P', 'color': '#000000'};
+		var result = {'str': '', 'color': '#000000'}
+		var num = Math.floor(call / 5) + 1;
+		var str;
+		switch(call % 5){
+			case 0: str="♣ ";	break;
+			case 1: str="♦ ";	result.color = '#ff0000';	break;
+			case 2: str="♥ ";	result.color = '#ff0000';	break;
+			case 3: str="♠ ";	break;
+			case 4: str="NK";	break;
+		}
+		result.str = str + num.toString();
+		return result;
+	}
+
+	setInterval(function() {
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		showpoker(player_cards);
+		showtable(on_table);
+		/*if(document.getElementById("bidding").style.visibility == "visible"){
+			ctx.font = "40px Arial";
+			ctx.fillStyle = "#000000";
+			ctx.fillText("Your turn to call!", 170, 400);
+		}*/
+		/*if(moving == player_id){
+			if(state == 1){
+				ctx.font = "40px Arial";
+				ctx.fillStyle = "#000000";
+				ctx.fillText("Your turn to call!", 170, 400);
+			}
+			else if(state == 2){
+				ctx.font = "40px Arial";
+				ctx.fillStyle = "#ff0000";
+				ctx.fillText("Your turn!", 80, 445);
+			}
+		}*/
+		if(current_call != -1){
+			if(CallOver){
+				ctx.font = "40px Arial";
+				var pr = bid_parser(current_call);
+				ctx.fillStyle = "#0000ff";
+				ctx.fillText(pr.str, 10, 50);
+				ctx.font = "16px Arial";
+				
+				if(player_sit_index % 2){
+					ctx.fillStyle = "#0000ff";
+					ctx.fillText('Team A: '+teams[0]+'/'+goals[0], 500, 20);
+					ctx.fillStyle = "#ff0000";
+					ctx.fillText('Team B: '+teams[1]+'/'+goals[1], 500, 35);
+				}
+				else {
+					ctx.fillStyle = "#ff0000";
+					ctx.fillText('Team A: '+teams[0]+'/'+goals[0], 500, 20);
+					ctx.fillStyle = "#0000ff";
+					ctx.fillText('Team B: '+teams[1]+'/'+goals[1], 500, 38);
+				}
+			}
+			else {
+				ctx.font = "72px Arial";
+				var pr = bid_parser(current_call);
+				ctx.fillStyle = pr.color;
+				ctx.fillText(pr.str, 230, 300);
+			}
+		}
+		//if(state == 2)
+		if(player_sit_index != -1){
+			ctx.font = "36px Arial";
+			ctx.fillStyle = "#000000";
+			ctx.fillText("P" + player_id, 20, 500);
+			ctx.fillText("P" + player_sit[(player_sit_index + 1) % 4], 20, 170);
+			ctx.fillText("P" + player_sit[(player_sit_index + 2) % 4], 280, 50);
+			ctx.fillText("P" + player_sit[(player_sit_index + 3) % 4], 500, 170);
+		}
+		var seat = -1;
+		for(i = 0; i < 4; i ++){
+			if(player_sit[(player_sit_index + i) % 4] == moving) seat = i;
+		}
+		if(seat != -1){
+			ctx.beginPath();
+			switch(seat){
+				case 0://300, 400
+					ctx.moveTo(300, 420);
+					ctx.lineTo(280, 410);
+					ctx.lineTo(300, 460);
+					ctx.lineTo(320, 410);
+					break;
+				case 1://240, 300
+					ctx.moveTo(220, 300);
+					ctx.lineTo(230, 280);
+					ctx.lineTo(180, 300);
+					ctx.lineTo(230, 320);
+					break;
+				case 2://300, 200
+					ctx.moveTo(300, 180);
+					ctx.lineTo(280, 190);
+					ctx.lineTo(300, 140);
+					ctx.lineTo(320, 190);
+					break;
+				case 3://360, 300
+					ctx.moveTo(380, 300);
+					ctx.lineTo(370, 280);
+					ctx.lineTo(420, 300);
+					ctx.lineTo(370, 320);
+					break;
+				default:
+					break;
+			}
+			ctx.fillStyle = "#ff0000";
+			ctx.fill();
+			ctx.closePath();
+		}
+	},50)
+	
+	function getMousePos(canvas, e){
+		var rect = canvas.getBoundingClientRect();
+		return {
+			x: e.clientX - rect.left,//相對於Canvas左上角的X座標
+			y: e.clientY - rect.top,//相對於Canvas左上角的Y座標
+			rectLeft : rect.left,
+			rectTop : rect.top,
+			clientX : e.clientX,
+			clientY : e.clientY
+		}
+	};
+	
+	canvas.addEventListener('click', function(e) {
+		var pos = getMousePos(canvas, e);
+		var x = 80, y = 480, w = 35, h = 120;
+		var val = -1;
+		var pivot = 0;
+		for(i = 0; i < 13; i ++)
+			if(player_cards[i] != -1) pivot = i;
+		var tmpx = x;
+		for(i = 0; i < 13; i ++){
+			if(player_cards[i] != -1){
+				if(i == pivot) w = 80;
+				if((pos.x >= tmpx && pos.x < tmpx + w) && (pos.y >= y && pos.y < y+h))
+				val = player_cards[i];
+				tmpx += 35;
+			}
+		}
+		if(val != -1) socket.emit('user_data', {'player_id': player_id, 'user_data': val});
+	});
+	
+	canvas.addEventListener('mousemove', function(e) {
+		var pos = getMousePos(canvas, e);
+		var x = 80, y = 480, w = 35, h = 120;
+		var val = -1;
+		var pivot = 0;
+		for(i = 0; i < 13; i ++)
+			if(player_cards[i] != -1) pivot = i;
+		var tmpx = x;
+		for(i = 0; i < 13; i ++){
+			if(player_cards[i] != -1){
+				if(i == pivot) w = 80;
+				if((pos.x >= tmpx && pos.x < tmpx + w) && (pos.y >= y && pos.y < y+h))
+				val = i;
+				tmpx += 35;
+			}
+		}
+		up = val;
+	});
+	</script>
+
+</body>
+</html>
