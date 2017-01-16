@@ -60,17 +60,12 @@ var player_count = 0;
 
 
 var server = http.createServer(function(request, response) {
-	console.log('Connection');
+	//console.log('Connection');
 	var path = url.parse(request.url).pathname;
 
 	switch (path) {
 		case '/':
-			response.writeHead(200, {'Content-Type': 'text/html'});
-			response.write('Hello, World.');
-			response.end();
-			break;
-		case '/index.html':
-			fs.readFile(__dirname + path, function(error, data) {
+			fs.readFile(__dirname + '/index.html', function(error, data) {
 				if (error){
 					response.writeHead(404);
 					response.write("opps this doesn't exist - 404");
@@ -103,7 +98,7 @@ var server = http.createServer(function(request, response) {
 	}
 });
 
-server.listen(5566);
+server.listen(80);
 
 
 	
@@ -265,5 +260,10 @@ serv_io.sockets.on('connection', function(socket) {
 					'current_call': current_table.bid[1]
 					});
 		if((current_table.player_sit[current_table.target - 1] == player_id) && current_table.state == 1) socket.emit('call', {'current_call': current_table.bid[1]});
+	});
+	socket.on('disconnect',function(){
+		var current_table = game_data[Math.floor((member_id-1)/4)];
+		if( current_table.state == 0 ) player_count--;
+		else current_table.state = 4;
 	});
 });
