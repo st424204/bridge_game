@@ -266,17 +266,17 @@
 				ctx.fillText(pr.str, 10, 50);
 				ctx.font = "16px Arial";
 				
-				if(player_sit_index % 2){
+				if(player_sit_index % 2 ==0 ){
 					ctx.fillStyle = "#0000ff";
-					ctx.fillText('Team A: '+teams[0]+'/'+goals[0], 500, 20);
+					ctx.fillText('Your team: '+teams[0]+'/'+goals[0], 450, 20);
 					ctx.fillStyle = "#ff0000";
-					ctx.fillText('Team B: '+teams[1]+'/'+goals[1], 500, 35);
+					ctx.fillText('Enemy team: '+teams[1]+'/'+goals[1], 450, 35);
 				}
 				else {
-					ctx.fillStyle = "#ff0000";
-					ctx.fillText('Team A: '+teams[0]+'/'+goals[0], 500, 20);
 					ctx.fillStyle = "#0000ff";
-					ctx.fillText('Team B: '+teams[1]+'/'+goals[1], 500, 38);
+					ctx.fillText('Your team: '+teams[1]+'/'+goals[1], 450, 20);
+					ctx.fillStyle = "#ff0000";
+					ctx.fillText('Enemy team: '+teams[0]+'/'+goals[0], 450, 38);
 				}
 			}
 			else {
@@ -348,6 +348,7 @@
 	};
 	
 	canvas.addEventListener('click', function(e) {
+		if(state != 2) return;
 		var pos = getMousePos(canvas, e);
 		var x = 80, y = 480, w = 35, h = 120;
 		var val = -1;

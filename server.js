@@ -38,14 +38,9 @@ function bridge_game(){
 	for(var i = 0; i < 52; i ++) cards[i] = i + 1;
 	shuffle(cards);
 	
-	for(var i = 0; i < 13; i ++)
-		this.player_cards[0][i] = cards[i];
-	for(var i = 13; i < 26; i++)
-		this.player_cards[1][i - 13] = cards[i];
-	for(var i = 26; i < 39; i ++)
-		this.player_cards[2][i - 26] = cards[i];
-	for(var i = 39; i < 52; i ++)
-		this.player_cards[3][i - 39] = cards[i];
+	for(var i = 0; i < 52; i ++)
+		this.player_cards[Math.floor(i/13)][i%13] = cards[i];
+	
 	for(var i = 0; i < 4; i ++)
 		this.player_cards[i].sort(function(a, b){ return a - b; });
 	shuffle(this.player_sit);
@@ -234,11 +229,11 @@ serv_io.sockets.on('connection', function(socket) {
 								win_scroce = scroce;
 							}
 						}
-						current_table.teams[current_table.player_sit.indexOf(winner) % 2] ++;
-						if(current_table.teams[current_table.player_sit.indexOf(winner) % 2] == current_table.goals[current_table.player_sit.indexOf(winner) % 2]){
+						current_table.teams[(winner-1) % 2] ++;
+						if(current_table.teams[(winner-1) % 2 ] == current_table.goals[(winner-1) % 2]){
 							if(current_table.player_sit.indexOf(winner) % 2 == 0) current_table.display_message = "Team A Win";
 							else current_table.display_message = "Team B Win";
-							serv_io.to(room).emit('over', {'winner': (current_table.player_sit.indexOf(winner) % 2)});
+							serv_io.to(room).emit('over', {'winner': ((winner-1) % 2)});
 							current_table.state = 3;
 							break;
 						}								
