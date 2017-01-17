@@ -100,15 +100,19 @@ var server = http.createServer(function(request, response) {
 
 server.listen(80);
 
+//serv_io.to(room).
 
-	
+
 
 var serv_io = io.listen(server); // 開啟 Socket.IO 的 listener
 serv_io.sockets.on('connection', function(socket) {
-	
+	console.log(socket['id']);
 	
 	var member_id = ++player_count;
 	var player_id = (member_id-1)%4+1;
+	var room = Math.floor((member_id-1)/4)+1;
+	
+	socket.join(room);
 	
 	socket.emit('player_id', {'player_id': player_id , 'state': 0, 'display_message': "wait"});
 	
@@ -117,11 +121,10 @@ serv_io.sockets.on('connection', function(socket) {
 		game_data[player_count/4-1].state = 1;
 		game_data[player_count/4-1].display_message = "start";
 	}		
-		
-	socket.on('request_data', function(data) {
+	
+	function send_to_room_of_client(){
 		var current_table = game_data[Math.floor((member_id-1)/4)];
-		
-		socket.emit('get_data', {'player_id': data.player_id,
+		serv_io.to(room).emit('get_data', {'player_id': player_id,
 					'state': current_table.state,
 					'display_message': current_table.display_message,
 					'player_cards': current_table.player_cards[Number(player_id) - 1],
@@ -132,9 +135,11 @@ serv_io.sockets.on('connection', function(socket) {
 					'moving': current_table.player_sit[current_table.target - 1],
 					'current_call': current_table.bid[1]
 					});
-		if((current_table.player_sit[current_table.target - 1] == player_id) && current_table.state == 1) socket.emit('call', {'current_call': current_table.bid[1]});
+		if(current_table.state == 1) serv_io.to(room).emit('call', {'player_id':current_table.player_sit[current_table.target - 1],'current_call': current_table.bid[1]});
 		
-	});
+	}
+	send_to_room_of_client();
+	
 	socket.on('user_data', function(data) {
 		var current_table = game_data[Math.floor((member_id-1)/4)];
 		switch(current_table.state){
@@ -234,7 +239,7 @@ serv_io.sockets.on('connection', function(socket) {
 						if(current_table.teams[current_table.player_sit.indexOf(winner) % 2] == current_table.goals[current_table.player_sit.indexOf(winner) % 2]){
 							if(current_table.player_sit.indexOf(winner) % 2 == 0) current_table.display_message = "Team A Win";
 							else current_table.display_message = "Team B Win";
-							socket.emit('over', {'winner': (current_table.player_sit.indexOf(winner) % 2)});
+							serv_io.to(room).emit('over', {'winner': (current_table.player_sit.indexOf(winner) % 2)});
 							current_table.state = 3;
 							break;
 						}								
@@ -248,22 +253,12 @@ serv_io.sockets.on('connection', function(socket) {
 			default:
 				break;
 		}
-		socket.emit('get_data', {'player_id': player_id,
-					'state': current_table.state,
-					'display_message': current_table.display_message,
-					'player_cards': current_table.player_cards[Number(player_id) - 1],
-					'player_sit': current_table.player_sit,
-					'teams': current_table.teams,
-					'goals': current_table.goals,
-					'on_table': current_table.on_table,
-					'moving': current_table.player_sit[current_table.target - 1],
-					'current_call': current_table.bid[1]
-					});
-		if((current_table.player_sit[current_table.target - 1] == player_id) && current_table.state == 1) socket.emit('call', {'current_call': current_table.bid[1]});
+		send_to_room_of_client();
 	});
 	socket.on('disconnect',function(){
 		var current_table = game_data[Math.floor((member_id-1)/4)];
 		if( current_table.state == 0 ) player_count--;
 		else current_table.state = 4;
+		send_to_room_of_client();
 	});
 });

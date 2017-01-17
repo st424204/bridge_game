@@ -158,9 +158,11 @@
 	});
 
 	socket.on('call', function(data) {
-		current_call = data.current_call - 1;
-		document.getElementById("bidding").style.visibility="visible";
-		calling = true;
+		if(data.player_id == player_id){
+			current_call = data.current_call - 1;
+			document.getElementById("bidding").style.visibility="visible";
+			calling = true
+		}
 	});
 	
 	socket.on('player_id', function(data) {//init
@@ -182,12 +184,12 @@
 		moving = -1;
 		document.getElementById("bidding").style.visibility="hidden";
 	});
-
+/*
 	setInterval(function() {
 		if(start_request){
 			socket.emit('request_data', {'player_id': player_id });
 		}
-	},500)
+	},500)*/
 
 	socket.on('get_data', function(data) {
 		$('#display_message').text(data.display_message);
