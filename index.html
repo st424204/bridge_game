@@ -196,7 +196,7 @@
 		if(data.display_message!='wait'){
 			$('#player_cards').text(data.player_cards.toString());
 			on_table = data.on_table.slice();
-			player_cards = data.player_cards.slice();
+			player_cards = data.player_cards[player_id-1].slice();
 			player_sit = data.player_sit.slice();
 			teams = data.teams;
 			goals = data.goals;

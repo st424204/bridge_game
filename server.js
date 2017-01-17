@@ -124,10 +124,9 @@ serv_io.sockets.on('connection', function(socket) {
 	
 	function send_to_room_of_client(){
 		var current_table = game_data[Math.floor((member_id-1)/4)];
-		serv_io.to(room).emit('get_data', {'player_id': player_id,
-					'state': current_table.state,
+		serv_io.to(room).emit('get_data', {'state': current_table.state,
 					'display_message': current_table.display_message,
-					'player_cards': current_table.player_cards[Number(player_id) - 1],
+					'player_cards': current_table.player_cards,
 					'player_sit': current_table.player_sit,
 					'teams': current_table.teams,
 					'goals': current_table.goals,
